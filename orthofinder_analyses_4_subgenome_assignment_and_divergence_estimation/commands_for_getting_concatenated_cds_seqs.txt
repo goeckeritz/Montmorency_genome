@@ -1,0 +1,59 @@
+#finding for orthologous relationships between proteins is much more accurate than say, DNA sequence.
+#But ultimately our protein multiple sequence alignments (MSAs) should be converted back to DNA alignments for higher resolution at individual sites and better phylogenies. use
+#This is what we use pal2nal for: http://www.bork.embl.de/pal2nal/
+#These commands were what I used to obtain cds seqs for all of the proteins that are included in all of the orthogroup MSAs I wanted (e.g., those that included all species)
+#you will need cds.fasta sequences for each of your species - usually comes with the reference genome and annotation. 
+
+#Note, pal2nal freaks the hell out if the exact number of protein sequences in a list does not match the exact number of cds sequences in a file when doing the protein to DNA conversion. But, we'll get to it. 
+
+#first, extract every protein name from all wanted MSAs
+grep -Rh '^>' ./ | sed 's/>//' > sp_MSAs_sequence_list.txt
+
+#navigate to a new directory created for cds_seqs, and move the above list there.
+
+#split the sequence list into the individual species, and replace the *_prot_ with nothing in preparation to subset the cds fastas needed for each species. In other words, you need your 
+#protein names to match the original gene names in the species' fasta files. These prefixes will be added back later after the sequences are extracted/subsetted.  
+
+#Here's my example for making an apple gene list. Notice I remove 'apple_prot' from the name so the gene names in our MSAs now match the gene names in the cds file. 
+grep 'apple_prot' 7sp_MSAs_sequence_list.txt | sed 's/apple_prot_//' > apple_gene_list
+
+#then, extract these cds seqs from the cds fasta of each species (be sure these files are unzipped). We have to go through all of this trouble because pal2nal requires the EXACT # of seqs to be in the cds fasta that it uses to turn aa to cds. I will never stop being irritated by this, lol.
+#Have your get_subset_of_fasta.pl script wherever makes sense to you. Mine was in a directory elsewhere. If you've got more than 10 species you might want to write a few loops... 
+
+ml icc/2018.3.222-GCC-7.3.0-2.30  impi/2018.3.222
+ml MAKER/2.31.10 
+../../get_subset_of_fastas.pl -l species_gene_list -f /mnt/gs21/scratch/goeckeri/orthofinder_montAv5/Genomes/species_cds.fa -o [species]_7sp_MSAs_cds.fa
+
+#Before moving on, look at each one of the cds fastas. Clean up the >headers if they have anything besides the gene name on them, because often they will.  
+#For example, a peach header in the cds fasta would look like this: >Prupe.I001100.1 polypeptide=Prupe.I001100.1.p locus=Prupe.I001100 ID=Prupe.I001100.1_v2.0.a1 annot-version=v2.1
+
+sed -i 's/ polypeptide=Prupe.*//' peach_7sp_MSAs_cds.fa
+
+#some similar commands I used for the other species. 
+sed -i 's/ FUN.*//' avium_7sp_MSAs_cds.fa
+sed -i 's/ gene=Pfrut.*//' fruticosa_7sp_MSAs_cds.fa
+sed -i 's/ gene=Pcer.*//' sub[A,B,A__]_7sp_MSAs_cds.fa
+
+# !! be careful there are no spaces at the end of these gene names after cleaning up each species 7sp cds fastas. 
+
+#re-add the prefixes back to the gene names. They need to look exactly as they did in the original aa MSAs.
+#example: 
+sed -i 's/^>/apple_prot_/' apple_7sp_MSAs_cds.fa
+
+#concatenate all the species' 7sp MSAs cds files. This is sort of our cds master file. It should contain a cds sequence for every protein in our MSAs.
+cat *MSAs_cds.fa > concatenated_cds.fa
+ 
+#Check that the number of genes we have in our concatenated cds file matches the number of lines in the original sequence list in this directory. These next two commands should give you the same number.
+wc -l [7,8]sps_MSAs_sequence_list.txt 
+grep '^>' concatenated_cds.fa | wc -l
+
+#Lastly, concatenate all the OG*.fa in the 7sp_Orthogroup_MSAs directory and put that in your pal2nal folder. The number of genes in our MSAs should match the number of cds sequences in our concatenated file EXACTLY OR YOU WILL FEEL THE RAGE OF PAL2NAL
+#Go to the directory with all your orthogroup MSAs - careful you don't accidentally paste a non-orthogroup MSA in this file.
+cat *MSAs.fa > concatenated_MSAs_aa.fa
+
+
+#these files are now ready for pal2nal! Once it runs, and the concatenated protein MSAs are output in the cds format, each one of the sequences for each orthogroup will need to be extracted, to put them back into their own orthogroup_MSA.fa file (but now they are in DNA format...)
+
+
+
+
